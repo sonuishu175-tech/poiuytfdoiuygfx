@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Assistant India — Admin Console</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge">AI</div>
+      <div>
+        <h1>AI ASSISTANT INDIA</h1>
+        <p>Production Firebase Admin Console</p>
+      </div>
+    </div>
+    <div id="authStatus" class="auth-actions">
+      <button id="loginBtn" class="btn-gold">Sign in with Admin Google</button>
+      <button id="logoutBtn" class="btn-outline hidden">Logout</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="loginNotice" class="card glass">
+      <h2>Authorized Admin Sign-In Required</h2>
+      <p>Sign in with your verified administrator Google account (<code>biharkrantidal76@gmail.com</code>) to manage users, AI models, credits, and push notifications.</p>
+    </section>
+
+    <div id="dashboard" class="hidden">
+      <section class="stats-grid">
+        <div class="card stat-card"><span class="label">Total Users</span><strong id="statUsers">0</strong></div>
+        <div class="card stat-card"><span class="label">DAU (24h Active)</span><strong id="statDau">0</strong></div>
+        <div class="card stat-card"><span class="label">MAU (30d Active)</span><strong id="statMau">0</strong></div>
+        <div class="card stat-card"><span class="label">AI Requests</span><strong id="statRequests">0</strong></div>
+        <div class="card stat-card"><span class="label">Credits Used</span><strong id="statCreditsUsed">0</strong></div>
+        <div class="card stat-card"><span class="label">Ad Rewards</span><strong id="statAdRewards">0</strong></div>
+        <div class="card stat-card"><span class="label">Active Subscriptions</span><strong id="statSubs">0</strong></div>
+      </section>
+
+      <section class="two-col">
+        <div class="card glass">
+          <h3>Global AI &amp; App Config</h3>
+          <form id="configForm">
+            <label>Active Gemini Model
+              <select id="activeModel">
+                <option value="gemini-3.8-flash">gemini-3.8-flash (Default)</option>
+                <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Fast)</option>
+                <option value="gemini-4-argon">gemini-4-argon (Complex Reasoning)</option>
+              </select>
+            </label>
+            <label>Chat Credit Cost
+              <input id="chatCost" type="number" min="1" max="20" value="1" />
+            </label>
+            <label>Vision Credit Cost
+              <input id="visionCost" type="number" min="1" max="20" value="2" />
+            </label>
+            <label>Document Credit Cost
+              <input id="docCost" type="number" min="1" max="20" value="2" />
+            </label>
+            <label class="checkbox-row">
+              <input id="maintenanceMode" type="checkbox" />
+              <span>Enable Maintenance Mode (pauses client screens)</span>
+            </label>
+            <button type="submit" class="btn-gold">Save Configuration</button>
+          </form>
+        </div>
+
+        <div class="card glass">
+          <h3>Send User Notification</h3>
+          <form id="notifyForm">
+            <label>Target User UID
+              <input id="notifyUid" type="text" placeholder="Paste user UID" required />
+            </label>
+            <label>Title
+              <input id="notifyTitle" type="text" placeholder="New AI Update" required />
+            </label>
+            <label>Message
+              <textarea id="notifyMessage" rows="3" placeholder="Announcement message..." required></textarea>
+            </label>
+            <button type="submit" class="btn-gold">Send Notification</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="card glass">
+        <div class="section-header">
+          <h3>Users &amp; Credits Management</h3>
+          <button id="refreshBtn" class="btn-outline">Refresh Data</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name / UID</th>
+                <th>Contact</th>
+                <th>Plan</th>
+                <th>Credits</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Authenticated user profile, preferences, AI credit balance, and membership tier.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "name": { "type": "string", "description": "Display name" },
+        "email": { "type": "string", "description": "Optional email address" },
+        "phone": { "type": "string", "description": "Optional phone number" },
+        "photoUrl": { "type": "string", "description": "Optional avatar URL" },
+        "language": { "type": "string", "enum": ["en", "hi"], "description": "Preferred UI and AI language code" },
+        "credits": { "type": "integer", "description": "Remaining AI credits" },
+        "membership": { "type": "string", "enum": ["free", "weekly", "monthly", "yearly"], "description": "Current plan tier" },
+        "darkMode": { "type": "boolean", "description": "Theme preference" },
+        "notificationsEnabled": { "type": "boolean", "description": "Reminder and alert toggle" },
+        "lastDailyCreditDate": { "type": "string", "description": "YYYY-MM-DD date of last daily free credit claim" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp of account creation" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last update" }
+      },
+      "required": ["uid", "name", "language", "credits", "membership", "createdAt", "updatedAt"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "AI conversation thread owned by a user.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Owner Firebase Auth UID" },
+        "title": { "type": "string", "description": "Conversation title" },
+        "toolId": { "type": "string", "description": "Tool identifier" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last activity server timestamp" }
+      },
+      "required": ["uid", "title", "toolId", "createdAt", "updatedAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Single user or AI message inside a chat thread.",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string", "description": "Parent chat ID" },
+        "uid": { "type": "string", "description": "Denormalized owner UID" },
+        "role": { "type": "string", "enum": ["user", "model"], "description": "Message author role" },
+        "content": { "type": "string", "description": "Message text content" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["chatId", "uid", "role", "content", "timestamp"]
+    },
+    "CreditTransaction": {
+      "title": "CreditTransaction",
+      "description": "Ledger entry for AI credit grants and usage deductions.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Owner UID" },
+        "amount": { "type": "integer", "description": "Credit delta (positive or negative)" },
+        "type": { "type": "string", "enum": ["daily_free", "reward_ad", "ai_usage", "subscription", "admin_adjust"], "description": "Transaction category" },
+        "feature": { "type": "string", "description": "Feature or source label" },
+        "status": { "type": "string", "enum": ["completed", "pending", "failed"], "description": "Transaction status" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["uid", "amount", "type", "feature", "status", "timestamp"]
+    },
+    "Subscription": {
+      "title": "Subscription",
+      "description": "User subscription status record.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Owner UID" },
+        "planId": { "type": "string", "enum": ["free", "weekly", "monthly", "yearly"], "description": "Plan identifier" },
+        "status": { "type": "string", "enum": ["active", "expired", "cancelled", "pending"], "description": "Subscription status" },
+        "expiryDate": { "type": "string", "format": "date-time", "description": "Optional expiry timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["uid", "planId", "status", "updatedAt"]
+    },
+    "UserFile": {
+      "title": "UserFile",
+      "description": "Uploaded PDF metadata and generated summary.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Owner UID" },
+        "fileName": { "type": "string", "description": "Document file name" },
+        "storagePath": { "type": "string", "description": "Storage or local reference path" },
+        "sizeBytes": { "type": "integer", "description": "File size in bytes" },
+        "summary": { "type": "string", "description": "Optional AI summary" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["uid", "fileName", "storagePath", "sizeBytes", "createdAt"]
+    },
+    "DailyTask": {
+      "title": "DailyTask",
+      "description": "Daily planner task or study timetable item.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Owner UID" },
+        "title": { "type": "string", "description": "Task title" },
+        "category": { "type": "string", "description": "Task category (Study, Work, Goal)" },
+        "completed": { "type": "boolean", "description": "Completion flag" },
+        "reminderTime": { "type": "string", "description": "Scheduled reminder label" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["uid", "title", "category", "completed", "reminderTime", "createdAt", "updatedAt"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "In-app notification record.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Recipient UID" },
+        "title": { "type": "string", "description": "Notification title" },
+        "message": { "type": "string", "description": "Notification body" },
+        "read": { "type": "boolean", "description": "Read flag" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["uid", "title", "message", "read", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Private user profiles and credit balances"
+    },
+    "/chats/{chatId}": {
+      "schema": { "$ref": "#/entities/Chat" },
+      "description": "User-owned AI chat sessions"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Messages belonging to a chat session"
+    },
+    "/creditTransactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/CreditTransaction" },
+      "description": "Credit ledger entries per user"
+    },
+    "/subscriptions/{uid}": {
+      "schema": { "$ref": "#/entities/Subscription" },
+      "description": "Subscription entitlements per user"
+    },
+    "/userFiles/{fileId}": {
+      "schema": { "$ref": "#/entities/UserFile" },
+      "description": "User PDF file records"
+    },
+    "/dailyTasks/{taskId}": {
+      "schema": { "$ref": "#/entities/DailyTask" },
+      "description": "User daily planner tasks"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/AppNotification" },
+      "description": "User notifications"
+    }
+  }
+}

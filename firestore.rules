@@ -1,0 +1,341 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny all by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Shared Security Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (
+          'email' in request.auth.token &&
+          'email_verified' in request.auth.token &&
+          request.auth.token.email == 'biharkrantidal76@gmail.com' &&
+          request.auth.token.email_verified == true
+        )
+      );
+    }
+
+    // --- Validation Blueprints ---
+    function isValidUser(data) {
+      return data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             data.language in ['en', 'hi', 'mr', 'ta', 'te', 'bn', 'gu'] &&
+             data.credits is int && data.credits >= 0 && data.credits <= 100000 &&
+             data.membership in ['free', 'weekly', 'monthly', 'yearly'] &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 200)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
+             (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 1000)) &&
+             (!('darkMode' in data) || data.darkMode is bool) &&
+             (!('notificationsEnabled' in data) || data.notificationsEnabled is bool) &&
+             (!('lastDailyCreditDate' in data) || (data.lastDailyCreditDate is string && data.lastDailyCreditDate.size() <= 20));
+    }
+
+    function isProfileUpdate() {
+      return incoming().credits == existing().credits &&
+             incoming().membership == existing().membership &&
+             incoming().diff(existing()).affectedKeys().hasOnly([
+               'name', 'phone', 'photoUrl', 'language', 'darkMode', 'notificationsEnabled', 'updatedAt'
+             ]);
+    }
+
+    function isCreditDeduct() {
+      return incoming().membership == existing().membership &&
+             incoming().credits is int &&
+             incoming().credits >= 0 &&
+             incoming().credits < existing().credits &&
+             (existing().credits - incoming().credits) <= 10 &&
+             incoming().diff(existing()).affectedKeys().hasOnly(['credits', 'updatedAt']);
+    }
+
+    function isRewardCreditGrant() {
+      return incoming().membership == existing().membership &&
+             incoming().credits is int &&
+             incoming().credits == existing().credits + 5 &&
+             incoming().credits <= 10000 &&
+             incoming().diff(existing()).affectedKeys().hasOnly(['credits', 'updatedAt']);
+    }
+
+    function isDailyCreditRefresh() {
+      return incoming().membership == existing().membership &&
+             incoming().credits is int &&
+             incoming().credits == 20 &&
+             existing().credits < 20 &&
+             ('lastDailyCreditDate' in incoming()) &&
+             incoming().lastDailyCreditDate is string &&
+             (!('lastDailyCreditDate' in existing()) || incoming().lastDailyCreditDate != existing().lastDailyCreditDate) &&
+             incoming().diff(existing()).affectedKeys().hasOnly(['credits', 'lastDailyCreditDate', 'updatedAt']);
+    }
+
+    function isValidChat(data) {
+      return data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+             data.toolId is string && data.toolId.size() >= 1 && data.toolId.size() <= 60 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidMessage(data) {
+      return data.chatId is string && data.chatId.size() >= 1 && data.chatId.size() <= 128 &&
+             data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+             data.role in ['user', 'model'] &&
+             data.content is string && data.content.size() >= 1 && data.content.size() <= 50000 &&
+             data.timestamp is timestamp && data.timestamp <= request.time;
+    }
+
+    function isValidCreditTransaction(data) {
+      return data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+             data.amount is int && data.amount >= -100 && data.amount <= 10000 &&
+             data.type in ['daily_free', 'reward_ad', 'ai_usage', 'subscription', 'admin_adjust'] &&
+             data.feature is string && data.feature.size() >= 1 && data.feature.size() <= 100 &&
+             data.status in ['completed', 'pending', 'failed'] &&
+             data.timestamp is timestamp && data.timestamp <= request.time;
+    }
+
+    function isValidSubscription(data) {
+      return data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+             data.planId in ['free', 'weekly', 'monthly', 'yearly'] &&
+             data.status in ['active', 'expired', 'cancelled', 'pending'] &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time &&
+             (!('expiryDate' in data) || data.expiryDate is timestamp);
+    }
+
+    function isValidUserFile(data) {
+      return data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+             data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 200 &&
+             data.storagePath is string && data.storagePath.size() >= 1 && data.storagePath.size() <= 500 &&
+             data.sizeBytes is int && data.sizeBytes >= 0 && data.sizeBytes <= 20971520 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('summary' in data) || (data.summary is string && data.summary.size() <= 20000));
+    }
+
+    function isValidDailyTask(data) {
+      return data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 60 &&
+             data.completed is bool &&
+             data.reminderTime is string && data.reminderTime.size() <= 40 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidNotification(data) {
+      return data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+             data.message is string && data.message.size() >= 1 && data.message.size() <= 1000 &&
+             data.read is bool &&
+             data.timestamp is timestamp && data.timestamp <= request.time;
+    }
+
+    // --- Collection Rules ---
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().uid == request.auth.uid &&
+                       incoming().credits == 20 &&
+                       incoming().membership == 'free' &&
+                       incoming().keys().hasAll(['uid', 'name', 'language', 'credits', 'membership', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly([
+                         'uid', 'name', 'email', 'phone', 'photoUrl', 'language',
+                         'credits', 'membership', 'darkMode', 'notificationsEnabled',
+                         'lastDailyCreditDate', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidUser(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       isValidUser(incoming()) &&
+                       incoming().uid == existing().uid &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         isAdmin() ||
+                         (request.auth.uid == userId && (
+                           isProfileUpdate() ||
+                           isCreditDeduct() ||
+                           isRewardCreditGrant() ||
+                           isDailyCreditRefresh()
+                         ))
+                       );
+
+      allow delete: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+    }
+
+    match /chats/{chatId} {
+      allow get: if isSignedIn() && isValidId(chatId) && (existing().uid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().uid == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(chatId) &&
+                       incoming().uid == request.auth.uid &&
+                       incoming().keys().hasAll(['uid', 'title', 'toolId', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['uid', 'title', 'toolId', 'createdAt', 'updatedAt']) &&
+                       isValidChat(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(chatId) &&
+                       isValidChat(incoming()) &&
+                       existing().uid == request.auth.uid &&
+                       incoming().uid == existing().uid &&
+                       incoming().createdAt == existing().createdAt &&
+                       (isAdmin() || incoming().diff(existing()).affectedKeys().hasOnly(['title', 'updatedAt']));
+
+      allow delete: if isSignedIn() && isValidId(chatId) && (existing().uid == request.auth.uid || isAdmin());
+
+      match /messages/{messageId} {
+        allow get: if isSignedIn() && isValidId(chatId) && isValidId(messageId) && (existing().uid == request.auth.uid || isAdmin());
+        allow list: if isSignedIn() && (existing().uid == request.auth.uid || isAdmin());
+
+        allow create: if isSignedIn() &&
+                         isValidId(chatId) &&
+                         isValidId(messageId) &&
+                         incoming().uid == request.auth.uid &&
+                         incoming().chatId == chatId &&
+                         incoming().keys().hasAll(['chatId', 'uid', 'role', 'content', 'timestamp']) &&
+                         incoming().keys().hasOnly(['chatId', 'uid', 'role', 'content', 'timestamp']) &&
+                         isValidMessage(incoming());
+
+        allow update: if false;
+        allow delete: if isSignedIn() && isValidId(chatId) && isValidId(messageId) && (existing().uid == request.auth.uid || isAdmin());
+      }
+    }
+
+    match /creditTransactions/{transactionId} {
+      allow get: if isSignedIn() && isValidId(transactionId) && (existing().uid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().uid == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(transactionId) &&
+                       incoming().uid == request.auth.uid &&
+                       incoming().keys().hasAll(['uid', 'amount', 'type', 'feature', 'status', 'timestamp']) &&
+                       incoming().keys().hasOnly(['uid', 'amount', 'type', 'feature', 'status', 'timestamp']) &&
+                       isValidCreditTransaction(incoming()) &&
+                       (isAdmin() || (
+                         (incoming().type == 'ai_usage' && incoming().amount < 0 && incoming().amount >= -10) ||
+                         (incoming().type == 'reward_ad' && incoming().amount == 5) ||
+                         (incoming().type == 'daily_free' && incoming().amount == 20)
+                       ));
+
+      allow update, delete: if isAdmin();
+    }
+
+    match /subscriptions/{uid} {
+      allow get: if isSignedIn() && isValidId(uid) && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isSignedIn() &&
+                       isValidId(uid) &&
+                       isValidSubscription(incoming()) &&
+                       incoming().uid == uid &&
+                       incoming().keys().hasAll(['uid', 'planId', 'status', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['uid', 'planId', 'status', 'expiryDate', 'updatedAt']) &&
+                       (isAdmin() || (request.auth.uid == uid && incoming().planId == 'free' && incoming().status == 'active'));
+
+      allow update: if isAdmin() && isValidId(uid) && isValidSubscription(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /userFiles/{fileId} {
+      allow get: if isSignedIn() && isValidId(fileId) && (existing().uid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().uid == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(fileId) &&
+                       incoming().uid == request.auth.uid &&
+                       incoming().keys().hasAll(['uid', 'fileName', 'storagePath', 'sizeBytes', 'createdAt']) &&
+                       incoming().keys().hasOnly(['uid', 'fileName', 'storagePath', 'sizeBytes', 'summary', 'createdAt']) &&
+                       isValidUserFile(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(fileId) &&
+                       isValidUserFile(incoming()) &&
+                       existing().uid == request.auth.uid &&
+                       incoming().uid == existing().uid &&
+                       incoming().createdAt == existing().createdAt &&
+                       (isAdmin() || incoming().diff(existing()).affectedKeys().hasOnly(['summary']));
+
+      allow delete: if isSignedIn() && isValidId(fileId) && (existing().uid == request.auth.uid || isAdmin());
+    }
+
+    match /dailyTasks/{taskId} {
+      allow get: if isSignedIn() && isValidId(taskId) && (existing().uid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().uid == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(taskId) &&
+                       incoming().uid == request.auth.uid &&
+                       incoming().keys().hasAll(['uid', 'title', 'category', 'completed', 'reminderTime', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['uid', 'title', 'category', 'completed', 'reminderTime', 'createdAt', 'updatedAt']) &&
+                       isValidDailyTask(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(taskId) &&
+                       isValidDailyTask(incoming()) &&
+                       existing().uid == request.auth.uid &&
+                       incoming().uid == existing().uid &&
+                       incoming().createdAt == existing().createdAt &&
+                       (isAdmin() || incoming().diff(existing()).affectedKeys().hasOnly([
+                         'title', 'category', 'completed', 'reminderTime', 'updatedAt'
+                       ]));
+
+      allow delete: if isSignedIn() && isValidId(taskId) && (existing().uid == request.auth.uid || isAdmin());
+    }
+
+    match /notifications/{notificationId} {
+      allow get: if isSignedIn() && isValidId(notificationId) && (existing().uid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().uid == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(notificationId) &&
+                       (isAdmin() || incoming().uid == request.auth.uid) &&
+                       incoming().keys().hasAll(['uid', 'title', 'message', 'read', 'timestamp']) &&
+                       incoming().keys().hasOnly(['uid', 'title', 'message', 'read', 'timestamp']) &&
+                       isValidNotification(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(notificationId) &&
+                       isValidNotification(incoming()) &&
+                       existing().uid == request.auth.uid &&
+                       incoming().uid == existing().uid &&
+                       incoming().timestamp == existing().timestamp &&
+                       (isAdmin() || incoming().diff(existing()).affectedKeys().hasOnly(['read']));
+
+      allow delete: if isSignedIn() && isValidId(notificationId) && (existing().uid == request.auth.uid || isAdmin());
+    }
+
+    match /appConfig/{configId} {
+      allow get: if isSignedIn();
+      allow list, write: if isAdmin();
+    }
+
+    match /admins/{adminId} {
+      allow read, write: if false;
+    }
+  }
+}

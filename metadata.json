@@ -1,0 +1,6 @@
+{
+  "name": "AI Assistant India",
+  "description": "All-in-one AI assistant for India with 15 specialized AI tools, chat, voice, vision, resume builder, PDF assistant, and daily planner.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
